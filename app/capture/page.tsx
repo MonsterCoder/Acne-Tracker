@@ -4,14 +4,14 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { toast } from '@/components/ui/use-toast'
+import { Toast as toast } from '@/components/ui/toast'
 
 export default function CapturePage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
-
+  
   const handleCapture = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click()
