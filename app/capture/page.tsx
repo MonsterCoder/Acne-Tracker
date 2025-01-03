@@ -13,7 +13,7 @@ declare global {
 }
 
 export default function CapturePage() {
-  const [isCapturing, setIsCapturing] = useState(false)
+  const [isCapturing, setIsCapturing] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -33,10 +33,8 @@ export default function CapturePage() {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setIsCapturing(true);
-        };
+        videoRef.current.play();
+ 
       } else {
         throw new Error('Video element not available');
       }
@@ -52,7 +50,7 @@ export default function CapturePage() {
 
   // Move initialization to useEffect
   useEffect(() => {
-    if (!isCapturing && !capturedImage) {
+    if (isCapturing && !capturedImage) {
       initializeWebcam();
     }
     
@@ -63,7 +61,7 @@ export default function CapturePage() {
         tracks.forEach(track => track.stop());
       }
     };
-  }, []); // Empty dependency array means this runs once after mount
+}, [isCapturing]); // Empty dependency array means this runs once after mount
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
