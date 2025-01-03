@@ -1,101 +1,151 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Toast as toast } from '@/components/ui/toast'
 
+declare global {
+  interface Window {
+    cv: any;
+  }
+}
+
 export default function CapturePage() {
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isCapturing, setIsCapturing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const router = useRouter()
   
-  const handleCapture = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click()
-    }
-  }
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
+  const initializeWebcam = async () => {
+    console.log('initializeWebcam called, videoRef:', videoRef.current);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setIsCapturing(true);
+        };
+      } else {
+        throw new Error('Video element not available');
       }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!imagePreview) {
+    } catch (error) {
+      console.error('Error in initializeWebcam:', error);
       toast({
         title: "Error",
-        description: "No image selected",
+        description: "Could not access webcam",
         variant: "destructive",
-      })
-      return
+      });
+    }
+  };
+
+  // Move initialization to useEffect
+  useEffect(() => {
+    if (!isCapturing && !capturedImage) {
+      initializeWebcam();
+    }
+    
+    // Cleanup function
+    return () => {
+      if (videoRef.current?.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    };
+  }, []); // Empty dependency array means this runs once after mount
+
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        
+        try {
+          context.drawImage(videoRef.current, 0, 0);
+          const imageData = canvasRef.current.toDataURL('image/jpeg');
+          setCapturedImage(imageData);
+          setIsCapturing(false);
+          
+          // Stop the webcam
+          const tracks = (videoRef.current.srcObject as MediaStream)?.getTracks();
+          tracks?.forEach(track => track.stop());
+        } catch (error) {
+          console.error('Error during capture:', error);
+        }
+      }
+    }
+  };
+
+  const retake = () => {
+    setCapturedImage(null);
+    // Stop any existing tracks
+    if (videoRef.current?.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    initializeWebcam();
+  };
+
+  const handleUpload = async () => {
+    if (!capturedImage) {
+      toast({
+        title: "Error",
+        description: "No image captured",
+        variant: "destructive",
+      });
+      return;
     }
 
-    setIsUploading(true)
+    setIsUploading(true);
 
     try {
-      console.log('Starting image upload...')
-      const formData = new FormData()
-      formData.append('image', dataURItoBlob(imagePreview))
+      const formData = new FormData();
+      formData.append('image', dataURItoBlob(capturedImage));
 
-      console.log('Sending fetch request...')
       const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData,
-      })
-
-      console.log('Fetch response received:', response.status, response.statusText)
+      });
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Server response:', errorText)
-        throw new Error(errorText || `HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      console.log('Parsing response JSON...')
-      const result = await response.json()
-      console.log('Parsed result:', result)
-
-      if (result.error) {
-        throw new Error(result.error)
-      }
-
-      console.log('Navigating to results page...')
-      router.push(`/results?data=${encodeURIComponent(JSON.stringify(result))}`)
+      const result = await response.json();
+      router.push(`/results?data=${encodeURIComponent(JSON.stringify(result))}`);
     } catch (error) {
-      console.error('Error in handleUpload:', error)
-      let errorMessage = 'An unknown error occurred'
-      if (error instanceof Error) {
-        errorMessage = error.message
-        console.error('Error stack:', error.stack)
-      }
+      console.error('Error in handleUpload:', error);
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   function dataURItoBlob(dataURI: string) {
-    const byteString = atob(dataURI.split(',')[1])
-    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0]
-    const ab = new ArrayBuffer(byteString.length)
-    const ia = new Uint8Array(ab)
+    const byteString = atob(dataURI.split(',')[1]);
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
     for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i)
+      ia[i] = byteString.charCodeAt(i);
     }
-    return new Blob([ab], { type: mimeString })
+    return new Blob([ab], { type: mimeString });
   }
 
   return (
@@ -103,31 +153,41 @@ export default function CapturePage() {
       <h1 className="text-3xl font-bold mb-8">Capture Your Image</h1>
       <Card className="w-full max-w-md">
         <CardContent className="flex flex-col items-center p-6">
-          {imagePreview ? (
-            <img src={imagePreview} alt="Preview" className="mb-4 max-w-full h-auto rounded" />
+          {isCapturing ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              controls
+              className="mb-4 max-w-full h-auto rounded"
+            />
+          ) : capturedImage ? (
+            <img 
+              src={capturedImage} 
+              alt="Captured" 
+              className="mb-4 max-w-full h-auto rounded" 
+            />
           ) : (
             <div className="w-full h-64 bg-gray-200 flex items-center justify-center mb-4 rounded">
-              <p className="text-gray-500">No image captured</p>
+              <p className="text-gray-500">Initializing camera...</p>
             </div>
           )}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-          />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
           <div className="space-x-4">
-            <Button onClick={handleCapture}>
-              {imagePreview ? 'Recapture' : 'Capture Image'}
-            </Button>
-            <Button onClick={handleUpload} disabled={!imagePreview || isUploading}>
-              {isUploading ? 'Uploading...' : 'Upload for Analysis'}
-            </Button>
+            {isCapturing ? (
+              <Button onClick={captureImage}>Capture</Button>
+            ) : capturedImage ? (
+              <>
+                <Button onClick={retake}>Retake</Button>
+                <Button onClick={handleUpload} disabled={isUploading}>
+                  {isUploading ? 'Uploading...' : 'Upload for Analysis'}
+                </Button>
+              </>
+            ) : null}
           </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
