@@ -24,7 +24,7 @@ export default function UploadPage() {
       const formData = new FormData();
       formData.append('image', dataURItoBlob(imageData));
 
-      const response = await fetch('/api/analyze', {
+      const response = await fetch('http://localhost:8000/api/acne/analyze', {
         method: 'POST',
         body: formData,
       });

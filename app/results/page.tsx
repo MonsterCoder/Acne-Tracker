@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { toast } from '@/components/ui/use-toast'
+import { Toast as toast } from '@/components/ui/toast'
 
 interface AnalysisResult {
   acneCount: number
@@ -24,6 +24,7 @@ export default function ResultsPage() {
       try {
         const parsedData = JSON.parse(decodeURIComponent(data))
         setResults(parsedData)
+        console.log(parsedData)
       } catch (error) {
         console.error('Error parsing results:', error)
         toast({
@@ -55,9 +56,15 @@ export default function ResultsPage() {
           <CardTitle>Acne Analysis</CardTitle>
         </CardHeader>
         <CardContent>
-          <p><strong>Acne Count:</strong> {results.acneCount}</p>
+          <p>Acne Count: {results.total_detected}</p>
+          {/* loop through results.records, display each record */}
+          {results.records.map((record, index) => (
+            <p key={index}>{record.location}</p>
+          ))}
+
+          {/* <p><strong>Acne Count:</strong> {results.acneCount}</p>
           <p><strong>Severity Level:</strong> {results.severity}</p>
-          <p><strong>Affected Areas:</strong> {results.locations.join(', ')}</p>
+          <p><strong>Affected Areas:</strong> {results.locations.join(', ')}</p> */}
         </CardContent>
       </Card>
       <div className="space-x-4">
