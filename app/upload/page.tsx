@@ -1,17 +1,17 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Toast as toast } from '@/components/ui/toast'
+import { useImage } from '@/context/ImageContext'
 
 export default function UploadPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const capturedImage = searchParams.get('image')
+  const { imageData, setImageData } = useImage()
 
   const handleUpload = async () => {
-    if (!capturedImage) {
+    if (!imageData) {
       toast({
         title: "Error",
         description: "No image available",
@@ -22,7 +22,7 @@ export default function UploadPage() {
 
     try {
       const formData = new FormData();
-      formData.append('image', dataURItoBlob(capturedImage));
+      formData.append('image', dataURItoBlob(imageData));
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -46,6 +46,7 @@ export default function UploadPage() {
   };
 
   const handleRetake = () => {
+    setImageData(null);
     router.push('/capture');
   };
 
@@ -65,9 +66,9 @@ export default function UploadPage() {
       <h1 className="text-3xl font-bold mb-8">Review Your Image</h1>
       <Card className="w-full max-w-md">
         <CardContent className="flex flex-col items-center p-6">
-          {capturedImage ? (
+          {imageData ? (
             <img 
-              src={capturedImage} 
+              src={imageData} 
               alt="Captured" 
               className="mb-4 max-w-full h-auto rounded" 
             />
