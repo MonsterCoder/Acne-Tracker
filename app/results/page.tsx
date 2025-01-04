@@ -58,9 +58,12 @@ export default function ResultsPage() {
         <CardContent>
           <p>Acne Count: {results.total_detected}</p>
           {/* loop through results.records, display each record */}
-          {results.records.map((record, index) => (
-            <p key={index}>{record.location}</p>
-          ))}
+          {/* only if results.records is not empty   */}
+          {results.records && results.records.length > 0 && (
+            results.records.map((record, index) => (
+              <p key={index}>{record.location}</p>
+            ))
+          )}
 
           {/* <p><strong>Acne Count:</strong> {results.acneCount}</p>
           <p><strong>Severity Level:</strong> {results.severity}</p>
