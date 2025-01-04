@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Toast as toast } from '@/components/ui/toast'
+import { Modal } from '@/components/ui/Modal'
 
 declare global {
   interface Window {
@@ -15,6 +16,7 @@ declare global {
 export default function CapturePage() {
   const [isCapturing, setIsCapturing] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
@@ -34,7 +36,6 @@ export default function CapturePage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
- 
       } else {
         throw new Error('Video element not available');
       }
@@ -48,20 +49,18 @@ export default function CapturePage() {
     }
   };
 
-  // Move initialization to useEffect
   useEffect(() => {
     if (isCapturing && !capturedImage) {
       initializeWebcam();
     }
     
-    // Cleanup function
     return () => {
       if (videoRef.current?.srcObject) {
         const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
         tracks.forEach(track => track.stop());
       }
     };
-}, [isCapturing]); // Empty dependency array means this runs once after mount
+  }, [isCapturing]);
 
   const captureImage = () => {
     if (videoRef.current && canvasRef.current) {
@@ -75,8 +74,8 @@ export default function CapturePage() {
           const imageData = canvasRef.current.toDataURL('image/jpeg');
           setCapturedImage(imageData);
           setIsCapturing(false);
+          setIsModalOpen(true);
           
-          // Stop the webcam
           const tracks = (videoRef.current.srcObject as MediaStream)?.getTracks();
           tracks?.forEach(track => track.stop());
         } catch (error) {
@@ -84,16 +83,6 @@ export default function CapturePage() {
         }
       }
     }
-  };
-
-  const retake = () => {
-    setCapturedImage(null);
-    // Stop any existing tracks
-    if (videoRef.current?.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-    }
-    initializeWebcam();
   };
 
   const handleUpload = async () => {
@@ -132,7 +121,15 @@ export default function CapturePage() {
       });
     } finally {
       setIsUploading(false);
+      setIsModalOpen(false);
     }
+  };
+
+  const retake = () => {
+    setCapturedImage(null);
+    setIsCapturing(true);
+    setIsModalOpen(false);
+    initializeWebcam();
   };
 
   function dataURItoBlob(dataURI: string) {
@@ -174,17 +171,17 @@ export default function CapturePage() {
           <div className="space-x-4">
             {isCapturing ? (
               <Button onClick={captureImage}>Capture</Button>
-            ) : capturedImage ? (
-              <>
-                <Button onClick={retake}>Retake</Button>
-                <Button onClick={handleUpload} disabled={isUploading}>
-                  {isUploading ? 'Uploading...' : 'Upload for Analysis'}
-                </Button>
-              </>
             ) : null}
           </div>
         </CardContent>
       </Card>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onUpload={handleUpload}
+        onRetake={retake}
+        capturedImage={capturedImage}
+      />
     </div>
   );
 }
