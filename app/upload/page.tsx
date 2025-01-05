@@ -23,12 +23,12 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append('image', dataURItoBlob(imageData));
-
+      console.log('formData loadd:');
       const response = await fetch('http://localhost:8000/api/acne/analyze', {
         method: 'POST',
         body: formData,
       });
-
+      console.log('response:', response);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -39,7 +39,7 @@ export default function UploadPage() {
       console.error('Error in handleUpload:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description: error instanceof Error ? error.message : error,
         variant: "destructive",
       });
     }
